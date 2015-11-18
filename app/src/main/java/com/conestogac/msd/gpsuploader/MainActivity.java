@@ -63,7 +63,6 @@ public class MainActivity extends Activity {
 
         myLocationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
 
-
         initSeekBar();
     }
 
@@ -72,10 +71,7 @@ public class MainActivity extends Activity {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 distance = progress;
-                textViewSeekDistance.setText(String.valueOf(progress));
-                setTargetLocation(distance, 60.0);  //todo degree must get from compass
-                textViewTargetLatitude.setText(getResources().getString(R.string.latPrefix) + String.format("%1$,.6f",targetLatitude));
-                textViewTargetLongitude.setText(getResources().getString(R.string.lonPrefix) + String.format("%1$,.6f",targetLongitude));
+                displayTarget(progress);
             }
 
             @Override
@@ -90,6 +86,13 @@ public class MainActivity extends Activity {
         });
         seekBarDistance.setProgress(distance);
         textViewSeekDistance.setText(String.valueOf(distance));
+    }
+
+    private void displayTarget(int progress) {
+        textViewSeekDistance.setText(String.valueOf(progress));
+        setTargetLocation(progress, 60.0);  //todo degree must get from compass
+        textViewTargetLatitude.setText(getResources().getString(R.string.latPrefix) + String.format("%1$,.6f",targetLatitude));
+        textViewTargetLongitude.setText(getResources().getString(R.string.lonPrefix) + String.format("%1$,.6f",targetLongitude));
     }
 
     private void initTextViews() {
@@ -172,6 +175,7 @@ public class MainActivity extends Activity {
             //start with last known location
             currentLocation = this.getLastKnownLocation();
             showMyLocation(currentLocation);
+            displayTarget(distance);
         }
         myLocationManager.requestLocationUpdates(
                 locationProvider, //provider
