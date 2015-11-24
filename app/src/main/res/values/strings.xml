@@ -8,8 +8,8 @@
     <string name="longitude">Longitude</string>
     <string name="notavailable">NA</string>
     <string name="send">Send</string>
-    <string name="distance">Distance</string>
-    <string name="direction">Direction</string>
+    <string name="distance">Target Distance(m)</string>
+    <string name="direction">Target Direction</string>
     <string name="targetLat">Target Latitude:</string>
     <string name="targetLon">Target Longitude:</string>
     <string name="outofservice">Out of Service</string>

@@ -10,6 +10,10 @@ package com.conestogac.msd.gpsuploader;
 
 import android.app.Activity;
 import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -18,6 +22,9 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.RotateAnimation;
+import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,8 +34,8 @@ import com.parse.ParseObject;
 
 import java.util.List;
 
-public class MainActivity extends Activity {
-    private final String TAG = this.getClass().getSimpleName();
+public class MainActivity extends Activity implements SensorEventListener {
+    private final String TAG = "MainActivity";
     TextView testViewStatus;
     TextView textViewLatitude;
     TextView textViewLongitude;
@@ -39,10 +46,9 @@ public class MainActivity extends Activity {
     TextView textViewdirection;
     //Spinner
     SeekBar seekBarDistance=null;
-    Integer distance = 1000;
+    Integer mDistance = 1000;
     double targetLatitude;
     double targetLongitude;
-
 
     LocationManager myLocationManager;
     boolean isGPSEnabled = false;
@@ -53,6 +59,24 @@ public class MainActivity extends Activity {
     private static final long MIN_DISTANCE_CHANGE_FOR_UPDATES = 10;
     private static final long MIN_TIME_BW_UPDATES = 1000 * 60 * 1;
 
+    private ImageView mPointer;
+    private SensorManager mSensorManager;
+    private Sensor mAccelerometer;
+    private Sensor mMagnetometer;
+    private float[] mLastAccelerometer = new float[3];
+    private float[] mLastMagnetometer = new float[3];
+    private boolean mLastAccelerometerSet = false;
+    private boolean mLastMagnetometerSet = false;
+    private float[] mR = new float[9];
+    private float[] mOrientation = new float[3];
+    private float mfilteredDegree = 0.0f;
+    private float mCurrentDegree = 0.0f;
+    private String mHeadingDirection;
+    private final String directions[] = {
+        "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+        "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+        "N"};
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -60,8 +84,11 @@ public class MainActivity extends Activity {
         ParseAnalytics.trackAppOpenedInBackground(getIntent());
 
         initTextViews();
-
         myLocationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+
+        mSensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
+        mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        mMagnetometer = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
         initSeekBar();
     }
@@ -70,7 +97,7 @@ public class MainActivity extends Activity {
         seekBarDistance.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                distance = progress;
+                mDistance = progress;
                 displayTarget(progress);
             }
 
@@ -84,15 +111,15 @@ public class MainActivity extends Activity {
 
             }
         });
-        seekBarDistance.setProgress(distance);
-        textViewSeekDistance.setText(String.valueOf(distance));
+        seekBarDistance.setProgress(mDistance);
+        textViewSeekDistance.setText(String.valueOf(mDistance));
     }
 
     private void displayTarget(int progress) {
         textViewSeekDistance.setText(String.valueOf(progress));
-        setTargetLocation(progress, 60.0);  //todo degree must get from compass
-        textViewTargetLatitude.setText(getResources().getString(R.string.latPrefix) + String.format("%1$,.6f",targetLatitude));
-        textViewTargetLongitude.setText(getResources().getString(R.string.lonPrefix) + String.format("%1$,.6f",targetLongitude));
+        setTargetLocation(progress, mfilteredDegree);  //todo degree must get from compass
+        textViewTargetLatitude.setText(getResources().getString(R.string.targetLat) + String.format("%1$,.6f",targetLatitude));
+        textViewTargetLongitude.setText(getResources().getString(R.string.targetLon) + String.format("%1$,.6f", targetLongitude));
     }
 
     private void initTextViews() {
@@ -106,6 +133,8 @@ public class MainActivity extends Activity {
 
         textViewTargetLatitude = (TextView) findViewById(R.id.tv_targetlatitude);
         textViewTargetLongitude = (TextView) findViewById(R.id.tv_targetlongitude);
+
+        mPointer = (ImageView) findViewById(R.id.pointer);
     }
 
     public void onClick(View v) {
@@ -149,11 +178,15 @@ public class MainActivity extends Activity {
         super.onPause();
         // Remove the listener you previously added
         myLocationManager.removeUpdates(myLocationListener);
+        mSensorManager.unregisterListener(this, mAccelerometer);
+        mSensorManager.unregisterListener(this, mMagnetometer);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_UI);
+        mSensorManager.registerListener(this, mMagnetometer, SensorManager.SENSOR_DELAY_UI);
         //To update status service, when foreground, this code block is moved from onCreate()
         isGPSEnabled = myLocationManager.isProviderEnabled(myLocationManager.GPS_PROVIDER);
         isNetworkEnabled = myLocationManager.isProviderEnabled(myLocationManager.NETWORK_PROVIDER);
@@ -175,7 +208,7 @@ public class MainActivity extends Activity {
             //start with last known location
             currentLocation = this.getLastKnownLocation();
             showMyLocation(currentLocation);
-            displayTarget(distance);
+            displayTarget(mDistance);
         }
         myLocationManager.requestLocationUpdates(
                 locationProvider, //provider
@@ -184,6 +217,53 @@ public class MainActivity extends Activity {
                 myLocationListener); //LocationListener
     }
 
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor == mAccelerometer) {
+            System.arraycopy(event.values, 0, mLastAccelerometer, 0, event.values.length);
+            mLastAccelerometerSet = true;
+        } else if (event.sensor == mMagnetometer) {
+            System.arraycopy(event.values, 0, mLastMagnetometer, 0, event.values.length);
+            mLastMagnetometerSet = true;
+        }
+        if (mLastAccelerometerSet && mLastMagnetometerSet) {
+            SensorManager.getRotationMatrix(mR, null, mLastAccelerometer, mLastMagnetometer);
+            SensorManager.getOrientation(mR, mOrientation);
+            float azimuthInRadians = mOrientation[0];
+            float azimuthInDegress = (float)(Math.toDegrees(azimuthInRadians)+360)%360;
+            Log.v("MainActivity", "Old Degree: " + mCurrentDegree + " azimuthInDegress: " + mfilteredDegree + " mfilteredDegree: " + mfilteredDegree);
+            mfilteredDegree = LowPassFilter.filter3D(mfilteredDegree,azimuthInDegress);
+            mfilteredDegree = (float)Math.round(mfilteredDegree*100)/100;
+            displayTargetDirection();
+            displayTarget(mDistance);
+            RotateAnimation ra = new RotateAnimation(
+                    mCurrentDegree,
+                    -mfilteredDegree,
+                    Animation.RELATIVE_TO_SELF, 0.5f,
+                    Animation.RELATIVE_TO_SELF,
+                    0.5f);
+
+            ra.setDuration(2000);
+            ra.setFillAfter(true);
+
+            mPointer.startAnimation(ra);
+            mCurrentDegree = -mfilteredDegree;
+        }
+    }
+
+    private void displayTargetDirection() {
+        int index;
+
+        index =  (int) Math.floor(((mfilteredDegree + 11.25) % 360) / 22.5);
+        Log.d("displayTargetDirection",mfilteredDegree+"index: "+index);
+        textViewdirection.setText(mfilteredDegree + "\u00B0 " + directions[index]);
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        // TODO Auto-generated method stub
+
+    }
 
     private void showMyLocation(Location l) {
         if (l == null) {
@@ -208,16 +288,28 @@ public class MainActivity extends Activity {
         @Override
         public void onProviderDisabled(String provider) {
 // TODO Auto-generated method stub
+            Log.d(TAG,"onProviderDisabled");
+            currentLocation = getLastKnownLocation();
+            showMyLocation(currentLocation);
+            displayTarget(mDistance);
         }
 
         @Override
         public void onProviderEnabled(String provider) {
 // TODO Auto-generated method stub
+            Log.d(TAG,"onProviderEnabled");
+            currentLocation = getLastKnownLocation();
+            showMyLocation(currentLocation);
+            displayTarget(mDistance);
         }
 
         @Override
         public void onStatusChanged(String provider, int status, Bundle extras) {
 // TODO Auto-generated method stub
+            Log.d(TAG,"onStatusChanged");
+            currentLocation = getLastKnownLocation();
+            showMyLocation(currentLocation);
+            displayTarget(mDistance);
         }
     };
 
@@ -300,15 +392,27 @@ public class MainActivity extends Activity {
         }
         return bestLocation;
     }
-
-    private void setTargetLocation(Integer distance, Double degree) {
+    /*
+    setTargetLocation
+    User location : lat_org, lon_org
+    Distance to target: d
+    Compass : NE direction -> α >0
+    Target Location:
+    lon_target = lon_org + d * sin α
+    lat_target = lat_org + d * cos α
+    http://www.ig.utexas.edu/outreach/googleearth/latlong.html
+    1° ≈ 111 km
+    0.001° ≈ 111 m
+    0.00001° ≈ 1 m
+    */
+    private void setTargetLocation(Integer distance, float degree) {
         double deltaDistLongitude;
         double deltaDistLatitude;
         final double PI = 3.141592;
         final double ratioDist2Degree = 111000;
 
-        deltaDistLongitude = (double)distance * Math.cos(Math.toRadians(degree));
-        deltaDistLatitude =(double)distance * Math.sin(Math.toRadians(degree));
+        deltaDistLongitude = (double) distance * Math.sin(Math.toRadians(degree));
+        deltaDistLatitude = (double) distance * Math.cos(Math.toRadians(degree));
         if (currentLocation != null) {
             targetLatitude = currentLocation.getLatitude() + deltaDistLatitude / ratioDist2Degree;
             targetLongitude = currentLocation.getLongitude() + deltaDistLongitude / ratioDist2Degree;
@@ -322,19 +426,6 @@ public class MainActivity extends Activity {
         testObject.saveInBackground();
     }
 
-
 }
 
 
-/*
-User location : lat_org, lon_org
-Distance to target: d
-Compass : NE direction -> α >0
-Target Location:
-lon_target = lon_org + d * cos α
-lat_target = lat_org + d * sin α
-http://www.ig.utexas.edu/outreach/googleearth/latlong.html
-1° ≈ 111 km
-0.001° ≈ 111 m
-0.00001° ≈ 1 m
-*/

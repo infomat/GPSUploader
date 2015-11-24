@@ -9,7 +9,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/notavailable"
-        android:textAppearance="?android:attr/textAppearanceLarge"
         android:id="@+id/tv_status"
         android:layout_marginLeft="10dp"
         android:layout_marginBottom="10dp" />
@@ -18,7 +17,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/notavailable"
-        android:textAppearance="?android:attr/textAppearanceLarge"
         android:id="@+id/tv_latitude"
         android:layout_below="@+id/tv_status"
         android:layout_alignStart="@+id/tv_status"
@@ -28,7 +26,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/notavailable"
-        android:textAppearance="?android:attr/textAppearanceLarge"
         android:id="@+id/tv_longitude"
         android:layout_below="@+id/tv_latitude"
         android:layout_alignStart="@+id/tv_latitude"
@@ -38,7 +35,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/direction"
-        android:textAppearance="?android:attr/textAppearanceLarge"
         android:id="@+id/tv_direction"
         android:layout_below="@+id/tv_longitude"
         android:layout_alignStart="@+id/tv_longitude"
@@ -48,7 +44,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/distance"
-        android:textAppearance="?android:attr/textAppearanceLarge"
         android:id="@+id/tv_distance"
         android:layout_below="@+id/tv_direction"
         android:layout_alignStart="@+id/tv_direction" />
@@ -64,14 +59,14 @@
         android:max="10000" />
 
     <ImageView
-        android:layout_width="fill_parent"
-        android:layout_height="fill_parent"
-        android:id="@+id/imageView"
-        android:layout_alignTop="@+id/tv_status"
-        android:layout_alignParentStart="true"
-        android:background="@drawable/gps_icon"
-        android:alpha="0.5"
-        android:adjustViewBounds="true" />
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/pointer"
+        android:adjustViewBounds="true"
+        android:src="@drawable/compass"
+        android:layout_above="@+id/button"
+        android:layout_centerHorizontal="true"
+        android:layout_below="@+id/tv_targetlongitude" />
 
     <Button
         android:layout_width="fill_parent"
@@ -83,16 +78,15 @@
         android:paddingEnd="@dimen/activity_horizontal_margin"
         android:paddingStart="@dimen/activity_horizontal_margin"
         android:singleLine="false"
-        android:paddingTop="30dp"
-        android:paddingBottom="30dp"
-        android:textSize="18sp"
+        android:paddingTop="20dp"
+        android:paddingBottom="20dp"
+        android:textSize="15sp"
         android:textStyle="bold"
         android:onClick="onClick"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceLarge"
         android:text="0"
         android:id="@+id/tv_seekdistance"
         android:layout_centerHorizontal="true"
@@ -101,7 +95,6 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceLarge"
         android:text="E"
         android:id="@+id/tv_seekdirection"
         android:layout_centerHorizontal="true"
@@ -110,21 +103,17 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceLarge"
         android:text="@string/targetLat"
         android:id="@+id/tv_targetlatitude"
-        android:layout_alignStart="@+id/tv_latitude"
-        android:layout_below="@+id/sb_distance"
-        android:layout_marginTop="30dp"
-        android:layout_marginBottom="10dp"
         android:foregroundTint="@color/accent_material_light"
         android:textColor="@color/accent_material_light"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:layout_below="@+id/sb_distance"
+        android:layout_alignStart="@+id/sb_distance" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceLarge"
         android:text="@string/targetLon"
         android:id="@+id/tv_targetlongitude"
         android:layout_alignStart="@+id/tv_latitude"
